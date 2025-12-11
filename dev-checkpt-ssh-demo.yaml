@@ -66,13 +66,11 @@ workspaces:
         - path: /home/owner/.ssh/checkpoint_remote_ed25519
           owner: 1000:1000
           mode: "0600"
-          content: |
-            ## inject via secret: checkpoint_remote_ed25519
+          content: ${secret:CHECKPOINT_REMOTE_KEY}
         - path: /home/owner/.ssh/checkpoint_remote_ed25519.pub
           owner: 1000:1000
           mode: "0644"
-          content: |
-            ## inject via secret: checkpoint_remote_ed25519_pub
+          content: ${secret:CHECKPOINT_REMOTE_PUB}
         - path: /home/owner/.ssh/config
           owner: 1000:1000
           mode: "0600"
@@ -88,8 +86,7 @@ workspaces:
         - path: /home/owner/.ssh/known_hosts
           owner: 1000:1000
           mode: "0644"
-          content: |
-            ## inject via secret: checkpoint_known_hosts
+          content: ${secret:CHECKPOINT_KNOWN_HOSTS}
   - name: dev-restore
     description: Restore validation workspace (simulates cutover target)
     env:
@@ -157,13 +154,11 @@ workspaces:
         - path: /home/owner/.ssh/checkpoint_remote_ed25519
           owner: 1000:1000
           mode: "0600"
-          content: |
-            ## inject via secret: checkpoint_remote_ed25519
+          content: ${secret:CHECKPOINT_REMOTE_KEY}
         - path: /home/owner/.ssh/checkpoint_remote_ed25519.pub
           owner: 1000:1000
           mode: "0644"
-          content: |
-            ## inject via secret: checkpoint_remote_ed25519_pub
+          content: ${secret:CHECKPOINT_REMOTE_PUB}
         - path: /home/owner/.ssh/config
           owner: 1000:1000
           mode: "0600"
@@ -179,8 +174,7 @@ workspaces:
         - path: /home/owner/.ssh/known_hosts
           owner: 1000:1000
           mode: "0644"
-          content: |
-            ## inject via secret: checkpoint_known_hosts
+          content: ${secret:CHECKPOINT_KNOWN_HOSTS}
   - name: checkpoint-agent
     description: Mutagen + checkpoint agent (SSH remote)
     env:
@@ -701,18 +695,15 @@ workspaces:
         - path: /home/owner/.ssh/ssh_host_checkpoint_ed25519
           owner: 1000:1000
           mode: "0600"
-          content: |
-            ## inject via secret: ssh_host_checkpoint_ed25519
+          content: ${secret:SSH_REMOTE_HOST_KEY}
         - path: /home/owner/.ssh/ssh_host_checkpoint_ed25519.pub
           owner: 1000:1000
           mode: "0644"
-          content: |
-            ## inject via secret: ssh_host_checkpoint_ed25519_pub
+          content: ${secret:SSH_REMOTE_HOST_KEY_PUB}
         - path: /home/owner/.ssh/authorized_keys
           owner: 1000:1000
           mode: "0600"
-          content: |
-            ## inject via secret: ssh_authorized_keys
+          content: ${secret:SSH_REMOTE_AUTH_KEYS}
         - path: /home/owner/.ssh/sshd_config
           owner: 1000:1000
           mode: "0600"
