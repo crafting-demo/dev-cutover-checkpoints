@@ -54,4 +54,4 @@ This demo models a cloud cutover scenario: a primary dev workspace is checkpoint
 
 ## Credentials and host
 - `ssh-remote` provides the SSH daemon and bare repo for the demo. In production, host the Git SSH remote on the backup cloud or a neutral location (not the primary).
-- Store SSH keys/known_hosts in Crafting secrets (not inline env vars) and surface them via files or secret mounts in the template. Set `CHECKPOINT_REMOTE` to your Git SSH URL and ensure the agent can push there.
+- Store SSH keys/known_hosts in Crafting secrets (not inline env vars). The demo YAML uses placeholders (`## inject via secret: ...`) where the private key, public key, known_hosts, host key, and authorized_keys should be mounted or templated from secrets. Set `CHECKPOINT_REMOTE` to your Git SSH URL and ensure the agent can push there.

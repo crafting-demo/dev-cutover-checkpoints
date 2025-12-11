@@ -67,14 +67,12 @@ workspaces:
           owner: 1000:1000
           mode: "0600"
           content: |
-            -----BEGIN OPENSSH PRIVATE KEY-----
-            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZWQyNTUxOQAAACCQF0MMH957IN4ImvFFY9LI+4XqY5UgCdNFdOf88SuP7QAAAJC/BYlEvwWJRAAAAAtzc2gtZWQyNTUxOQAAACCQF0MMH957IN4ImvFFY9LI+4XqY5UgCdNFdOf88SuP7QAAAEDdrjjQZKLCBF2wQhJmD0rOu6NPndI4YkCEKcdUpnQp45AXQwwf3nsg3gia8UVj0sj7hepjlSAJ00V05/zxK4/tAAAACW93bmVyQG9wcwECAwQ=
-            -----END OPENSSH PRIVATE KEY-----
+            ## inject via secret: checkpoint_remote_ed25519
         - path: /home/owner/.ssh/checkpoint_remote_ed25519.pub
           owner: 1000:1000
           mode: "0644"
           content: |
-            ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJAXQwwf3nsg3gia8UVj0sj7hepjlSAJ00V05/zxK4/t owner@ops
+            ## inject via secret: checkpoint_remote_ed25519_pub
         - path: /home/owner/.ssh/config
           owner: 1000:1000
           mode: "0600"
@@ -91,7 +89,7 @@ workspaces:
           owner: 1000:1000
           mode: "0644"
           content: |
-            [ssh-remote]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFUqdA9TlwU8yoV+cWDWrygQKhOPmrMgrMsEj3rXinmR
+            ## inject via secret: checkpoint_known_hosts
   - name: dev-restore
     description: Restore validation workspace (simulates cutover target)
     env:
@@ -160,14 +158,12 @@ workspaces:
           owner: 1000:1000
           mode: "0600"
           content: |
-            -----BEGIN OPENSSH PRIVATE KEY-----
-            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZWQyNTUxOQAAACCQF0MMH957IN4ImvFFY9LI+4XqY5UgCdNFdOf88SuP7QAAAJC/BYlEvwWJRAAAAAtzc2gtZWQyNTUxOQAAACCQF0MMH957IN4ImvFFY9LI+4XqY5UgCdNFdOf88SuP7QAAAEDdrjjQZKLCBF2wQhJmD0rOu6NPndI4YkCEKcdUpnQp45AXQwwf3nsg3gia8UVj0sj7hepjlSAJ00V05/zxK4/tAAAACW93bmVyQG9wcwECAwQ=
-            -----END OPENSSH PRIVATE KEY-----
+            ## inject via secret: checkpoint_remote_ed25519
         - path: /home/owner/.ssh/checkpoint_remote_ed25519.pub
           owner: 1000:1000
           mode: "0644"
           content: |
-            ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJAXQwwf3nsg3gia8UVj0sj7hepjlSAJ00V05/zxK4/t owner@ops
+            ## inject via secret: checkpoint_remote_ed25519_pub
         - path: /home/owner/.ssh/config
           owner: 1000:1000
           mode: "0600"
@@ -184,7 +180,7 @@ workspaces:
           owner: 1000:1000
           mode: "0644"
           content: |
-            [ssh-remote]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFUqdA9TlwU8yoV+cWDWrygQKhOPmrMgrMsEj3rXinmR
+            ## inject via secret: checkpoint_known_hosts
   - name: checkpoint-agent
     description: Mutagen + checkpoint agent (SSH remote)
     env:
@@ -706,19 +702,17 @@ workspaces:
           owner: 1000:1000
           mode: "0600"
           content: |
-            -----BEGIN OPENSSH PRIVATE KEY-----
-            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZWQyNTUxOQAAACBVKnQPU5cFPMqFfnFg1q8oECoTj5qzIKzLBI9614p5kQAAAJB5X8l1eV/JdQAAAAtzc2gtZWQyNTUxOQAAACBVKnQPU5cFPMqFfnFg1q8oECoTj5qzIKzLBI9614p5kQAAAEBL2LF23HIzEAZxEY+y0uqvPrbh4L7pAWNpqZaAAL0fu1UqdA9TlwU8yoV+cWDWrygQKhOPmrMgrMsEj3rXinmRAAAACW93bmVyQG9wcwECAwQ=
-            -----END OPENSSH PRIVATE KEY-----
+            ## inject via secret: ssh_host_checkpoint_ed25519
         - path: /home/owner/.ssh/ssh_host_checkpoint_ed25519.pub
           owner: 1000:1000
           mode: "0644"
           content: |
-            ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFUqdA9TlwU8yoV+cWDWrygQKhOPmrMgrMsEj3rXinmR owner@ops
+            ## inject via secret: ssh_host_checkpoint_ed25519_pub
         - path: /home/owner/.ssh/authorized_keys
           owner: 1000:1000
           mode: "0600"
           content: |
-            ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJAXQwwf3nsg3gia8UVj0sj7hepjlSAJ00V05/zxK4/t owner@ops
+            ## inject via secret: ssh_authorized_keys
         - path: /home/owner/.ssh/sshd_config
           owner: 1000:1000
           mode: "0600"
