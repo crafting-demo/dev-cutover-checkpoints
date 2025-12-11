@@ -1,0 +1,740 @@
+workspaces:
+  - name: dev
+    description: Developer workspace (SSH remote variant)
+    env:
+      - CHECKPOINT_REMOTE=ssh://owner@ssh-remote:2222/home/owner/checkpoints/remote.git
+      - CHECKPOINT_NAMESPACE=refs/checkpoints/${SANDBOX_NAME}
+    checkouts:
+      - path: app
+        repo:
+          git: https://github.com/octocat/Hello-World.git
+        version_spec: master
+    system:
+      files:
+        - path: /home/owner/restore_checkpoint.sh
+          owner: 1000:1000
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            # Restore working tree from the latest checkpoint in this sandbox.
+            # Run from the dev workspace terminal: bash ~/restore_checkpoint.sh
+            
+            set -euo pipefail
+            
+            SANDBOX="${SANDBOX_NAME:-dev-checkpoints-cron}"
+            CHECKPOINT_NS="refs/checkpoints/${SANDBOX}"
+            WORKDIR="/home/owner/app"
+            TMPDIR="$(mktemp -d)"
+            REMOTE_TGZ="${TMPDIR}/remote.git.tgz"
+            
+            log() { echo "[restore] $*"; }
+            cleanup() { rm -rf "${TMPDIR}"; }
+            trap cleanup EXIT
+            
+            # Determine restore source based on CHECKPOINT_REMOTE
+            if [[ "${CHECKPOINT_REMOTE}" == file://* ]]; then
+              log "File remote detected; fetching checkpoint archive from checkpoint-agent..."
+              cs scp "checkpoint-agent:/home/owner/remote.git.tgz" "${REMOTE_TGZ}"
+              rm -rf /home/owner/checkpoints /home/owner/remote.git
+              mkdir -p /home/owner
+              tar xzf "${REMOTE_TGZ}" -C /home/owner
+              chown -R owner:owner /home/owner/checkpoints
+              SOURCE_REPO="/home/owner/checkpoints/remote.git"
+            else
+              log "SSH remote detected; cloning directly from ${CHECKPOINT_REMOTE}"
+              SOURCE_REPO="${CHECKPOINT_REMOTE}"
+            fi
+            
+            log "Cloning into ${WORKDIR}..."
+            rm -rf "${WORKDIR}"
+            sudo -u owner git clone "${SOURCE_REPO}" "${WORKDIR}"
+            
+            log "Fetching latest checkpoint ref..."
+            sudo -u owner git -C "${WORKDIR}" fetch origin \
+              "${CHECKPOINT_NS}/main:${CHECKPOINT_NS}/main"
+            
+            log "Checking out restored branch at ${CHECKPOINT_NS}/main"
+            sudo -u owner git -C "${WORKDIR}" checkout -B restored "${CHECKPOINT_NS}/main"
+            
+            # Clean extracted checkpoint repo only if we used file:// path.
+            if [[ "${CHECKPOINT_REMOTE}" == file://* ]]; then
+              log "Cleaning extracted checkpoint repo..."
+              rm -rf /home/owner/checkpoints /home/owner/remote.git
+            fi
+            
+            log "Restore complete."
+        - path: /home/owner/.ssh/checkpoint_remote_ed25519
+          owner: 1000:1000
+          mode: "0600"
+          content: |
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZWQyNTUxOQAAACCQF0MMH957IN4ImvFFY9LI+4XqY5UgCdNFdOf88SuP7QAAAJC/BYlEvwWJRAAAAAtzc2gtZWQyNTUxOQAAACCQF0MMH957IN4ImvFFY9LI+4XqY5UgCdNFdOf88SuP7QAAAEDdrjjQZKLCBF2wQhJmD0rOu6NPndI4YkCEKcdUpnQp45AXQwwf3nsg3gia8UVj0sj7hepjlSAJ00V05/zxK4/tAAAACW93bmVyQG9wcwECAwQ=
+            -----END OPENSSH PRIVATE KEY-----
+        - path: /home/owner/.ssh/checkpoint_remote_ed25519.pub
+          owner: 1000:1000
+          mode: "0644"
+          content: |
+            ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJAXQwwf3nsg3gia8UVj0sj7hepjlSAJ00V05/zxK4/t owner@ops
+        - path: /home/owner/.ssh/config
+          owner: 1000:1000
+          mode: "0600"
+          content: |
+            Host ssh-remote
+              HostName ssh-remote
+              Port 2222
+              User owner
+              IdentityFile /home/owner/.ssh/checkpoint_remote_ed25519
+              StrictHostKeyChecking yes
+              UserKnownHostsFile /home/owner/.ssh/known_hosts
+              IdentitiesOnly yes
+        - path: /home/owner/.ssh/known_hosts
+          owner: 1000:1000
+          mode: "0644"
+          content: |
+            [ssh-remote]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFUqdA9TlwU8yoV+cWDWrygQKhOPmrMgrMsEj3rXinmR
+  - name: dev-restore
+    description: Restore validation workspace (simulates cutover target)
+    env:
+      - CHECKPOINT_REMOTE=ssh://owner@ssh-remote:2222/home/owner/checkpoints/remote.git
+      - CHECKPOINT_NAMESPACE=refs/checkpoints/${SANDBOX_NAME}
+    checkouts:
+      - path: app
+        repo:
+          git: https://github.com/octocat/Hello-World.git
+        version_spec: master
+    system:
+      files:
+        - path: /home/owner/restore_checkpoint.sh
+          owner: 1000:1000
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            # Restore working tree from the latest checkpoint in this sandbox.
+            # Run from the dev-restore workspace terminal: bash ~/restore_checkpoint.sh
+            
+            set -euo pipefail
+            
+            SANDBOX="${SANDBOX_NAME:-dev-checkpoints-cron}"
+            CHECKPOINT_NS="refs/checkpoints/${SANDBOX}"
+            WORKDIR="/home/owner/app"
+            TMPDIR="$(mktemp -d)"
+            REMOTE_TGZ="${TMPDIR}/remote.git.tgz"
+            
+            log() { echo "[restore] $*"; }
+            cleanup() { rm -rf "${TMPDIR}"; }
+            trap cleanup EXIT
+            
+            # Determine restore source based on CHECKPOINT_REMOTE
+            if [[ "${CHECKPOINT_REMOTE}" == file://* ]]; then
+              log "File remote detected; fetching checkpoint archive from checkpoint-agent..."
+              cs scp "checkpoint-agent:/home/owner/remote.git.tgz" "${REMOTE_TGZ}"
+              rm -rf /home/owner/checkpoints /home/owner/remote.git
+              mkdir -p /home/owner
+              tar xzf "${REMOTE_TGZ}" -C /home/owner
+              chown -R owner:owner /home/owner/checkpoints
+              SOURCE_REPO="/home/owner/checkpoints/remote.git"
+            else
+              log "SSH remote detected; cloning directly from ${CHECKPOINT_REMOTE}"
+              SOURCE_REPO="${CHECKPOINT_REMOTE}"
+            fi
+            
+            log "Cloning into ${WORKDIR}..."
+            rm -rf "${WORKDIR}"
+            sudo -u owner git clone "${SOURCE_REPO}" "${WORKDIR}"
+            
+            log "Fetching latest checkpoint ref..."
+            sudo -u owner git -C "${WORKDIR}" fetch origin \
+              "${CHECKPOINT_NS}/main:${CHECKPOINT_NS}/main"
+            
+            log "Checking out restored branch at ${CHECKPOINT_NS}/main"
+            sudo -u owner git -C "${WORKDIR}" checkout -B restored "${CHECKPOINT_NS}/main"
+            
+            # Clean extracted checkpoint repo only if we used file:// path.
+            if [[ "${CHECKPOINT_REMOTE}" == file://* ]]; then
+              log "Cleaning extracted checkpoint repo..."
+              rm -rf /home/owner/checkpoints /home/owner/remote.git
+            fi
+            
+            log "Restore complete."
+        - path: /home/owner/.ssh/checkpoint_remote_ed25519
+          owner: 1000:1000
+          mode: "0600"
+          content: |
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZWQyNTUxOQAAACCQF0MMH957IN4ImvFFY9LI+4XqY5UgCdNFdOf88SuP7QAAAJC/BYlEvwWJRAAAAAtzc2gtZWQyNTUxOQAAACCQF0MMH957IN4ImvFFY9LI+4XqY5UgCdNFdOf88SuP7QAAAEDdrjjQZKLCBF2wQhJmD0rOu6NPndI4YkCEKcdUpnQp45AXQwwf3nsg3gia8UVj0sj7hepjlSAJ00V05/zxK4/tAAAACW93bmVyQG9wcwECAwQ=
+            -----END OPENSSH PRIVATE KEY-----
+        - path: /home/owner/.ssh/checkpoint_remote_ed25519.pub
+          owner: 1000:1000
+          mode: "0644"
+          content: |
+            ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJAXQwwf3nsg3gia8UVj0sj7hepjlSAJ00V05/zxK4/t owner@ops
+        - path: /home/owner/.ssh/config
+          owner: 1000:1000
+          mode: "0600"
+          content: |
+            Host ssh-remote
+              HostName ssh-remote
+              Port 2222
+              User owner
+              IdentityFile /home/owner/.ssh/checkpoint_remote_ed25519
+              StrictHostKeyChecking yes
+              UserKnownHostsFile /home/owner/.ssh/known_hosts
+              IdentitiesOnly yes
+        - path: /home/owner/.ssh/known_hosts
+          owner: 1000:1000
+          mode: "0644"
+          content: |
+            [ssh-remote]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFUqdA9TlwU8yoV+cWDWrygQKhOPmrMgrMsEj3rXinmR
+  - name: checkpoint-agent
+    description: Mutagen + checkpoint agent (SSH remote)
+    env:
+      - DEV_MOUNT_TARGET=${SANDBOX_NAME}/dev:/home/owner/app
+      - CHECKPOINT_REMOTE=ssh://owner@ssh-remote:2222/home/owner/checkpoints/remote.git
+      - CHECKPOINT_NAMESPACE=refs/checkpoints/${SANDBOX_NAME}
+      - SANDBOX_ID=${SANDBOX_NAME}
+    system:
+      daemons:
+        - name: checkpoint-cron
+          spec:
+            argv:
+              - bash
+              - /home/owner/checkpoint_cron.sh
+            schedule: "*/2 * * * *"
+            identity:
+              uid: 1000
+        - name: mutagen-session
+          spec:
+            argv:
+              - bash
+              - /home/owner/start_mutagen.sh
+            identity:
+              uid: 1000
+      files:
+        - path: /home/owner/bootstrap.sh
+          owner: 1000:1000
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            # Prepare the checkpoint agent workspace.
+            # - Ensure directories for mirror/shadow/logs.
+            # - Sync the dev workspace into MIRROR_PATH via cs mutagen (includes .git).
+            # - Create a bare checkpoint remote locally if none is provided (PoC only).
+            
+            set -u
+            
+            MIRROR_PATH="${MIRROR_PATH:-/home/owner/dev-mirror}"               # holds the mirrored dev repo (with .git)
+            SHADOW_PATH="${SHADOW_PATH:-/home/owner/checkpoints/shadow}"       # holds the shadow git dir (.git) only
+            CHECKPOINT_REMOTE="${CHECKPOINT_REMOTE:-file:///home/owner/checkpoints/remote.git}"
+            DEV_MOUNT_TARGET="${DEV_MOUNT_TARGET:-${SANDBOX_NAME:-dev-checkpoints}/dev:/home/owner/app}"
+            CHECKPOINT_NS="${CHECKPOINT_NAMESPACE:-refs/checkpoints/demo}"
+            SESSION_NAME="${SESSION_NAME:-dev-to-checkpoint}"
+            
+            log() {
+              echo "[bootstrap] $*"
+            }
+            
+            ensure_dirs() {
+              mkdir -p "${MIRROR_PATH}" "${SHADOW_PATH}" "/home/owner/checkpoints/logs"
+            }
+            
+            ensure_checkpoint_remote() {
+              # For the PoC we default to a local bare repo; production should set CHECKPOINT_REMOTE to their BYO Git host.
+              if [[ "${CHECKPOINT_REMOTE}" == file://* ]]; then
+                local_path="${CHECKPOINT_REMOTE#file://}"
+                if [[ ! -d "${local_path}" || ! -d "${local_path}/refs" ]]; then
+                  log "Initializing local bare checkpoint repo at ${local_path}"
+                  mkdir -p "${local_path}"
+                  git init --bare "${local_path}"
+                fi
+              fi
+            }
+            
+            main() {
+              ensure_dirs
+              ensure_checkpoint_remote
+            
+              log "Bootstrap complete. Mirror=${MIRROR_PATH}, shadow=${SHADOW_PATH}, remote=${CHECKPOINT_REMOTE}, ns=${CHECKPOINT_NS}, target=${DEV_MOUNT_TARGET}"
+            }
+            
+            main "$@"
+        - path: /home/owner/start_mutagen.sh
+          owner: 1000:1000
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            # Long-lived mutagen session runner (persistent).
+            set -euo pipefail
+
+            MIRROR_PATH="${MIRROR_PATH:-/home/owner/dev-mirror}"
+            DEV_MOUNT_TARGET="${DEV_MOUNT_TARGET:-${SANDBOX_NAME:-dev-checkpoints}/dev:/home/owner/app}"
+            SESSION_NAME="${SESSION_NAME:-dev-to-checkpoint}"
+            LOG_DIR="${LOG_DIR:-/home/owner/checkpoints/logs}"
+            LOG_FILE="${LOG_FILE:-${LOG_DIR}/mutagen.log}"
+
+            mkdir -p "${LOG_DIR}"
+            echo "[mutagen] starting session ${SESSION_NAME}: ${DEV_MOUNT_TARGET} -> ${MIRROR_PATH}" | tee -a "${LOG_FILE}"
+            exec cs mutagen --name "${SESSION_NAME}" "${MIRROR_PATH}" "${DEV_MOUNT_TARGET}" >> "${LOG_FILE}" 2>&1
+        - path: /home/owner/checkpoint_agent.py
+          owner: 1000:1000
+          mode: "0755"
+          content: |
+            #!/usr/bin/env python3
+            """
+            Checkpoint agent prototype (no-rsync path).
+            
+            Flow:
+            - Mutagen mirrors the dev workspace (including .git) into MIRROR_PATH.
+            - The shadow repo keeps its git dir under SHADOW_PATH/.git but uses MIRROR_PATH as its worktree.
+            - On each run:
+              * Fetch the workspace commit graph (includes local, unpushed commits) from file://MIRROR_PATH/.git.
+              * Point a local branch refs/heads/checkpoint/<branch> at that workspace tip.
+              * If the mirrored worktree is dirty relative to the workspace tip, create a checkpoint commit.
+              * Push:
+                  - Workspace tip to refs/heads/<branch> on the checkpoint remote.
+                  - Checkpoint tip to refs/checkpoints/<namespace>/<branch>.
+            """
+            
+            from __future__ import annotations
+            
+            import argparse
+            import os
+            import subprocess
+            import sys
+            import textwrap
+            from dataclasses import dataclass
+            from datetime import datetime
+            from pathlib import Path
+            from typing import List, Optional
+            
+            
+            # ---------- Helpers ----------
+            
+            
+            class CmdError(RuntimeError):
+                """Raised when a subprocess exits non-zero."""
+            
+            
+            def run(
+                cmd: List[str],
+                *,
+                cwd: Optional[Path] = None,
+                capture: bool = True,
+                check: bool = True,
+                env: Optional[dict] = None,
+            ) -> str:
+                """
+                Run a shell command safely.
+            
+                Args:
+                    cmd: argv list.
+                    cwd: working directory (optional).
+                    capture: when True, returns stdout text.
+                    check: when True, raises on non-zero exit.
+                    env: extra env vars to layer on top of os.environ.
+                """
+                full_env = os.environ.copy()
+                if env:
+                    full_env.update(env)
+            
+                result = subprocess.run(
+                    cmd,
+                    cwd=str(cwd) if cwd else None,
+                    text=True,
+                    stdout=subprocess.PIPE if capture else None,
+                    stderr=subprocess.PIPE if capture else None,
+                    env=full_env,
+                )
+                if check and result.returncode != 0:
+                    raise CmdError(f"Command failed ({result.returncode}): {' '.join(cmd)}\n{result.stderr}")
+                return result.stdout.strip() if capture else ""
+            
+            
+            def ensure_dir(path: Path) -> None:
+                """Create a directory if missing."""
+                path.mkdir(parents=True, exist_ok=True)
+            
+            
+            def write_text(path: Path, content: str) -> None:
+                """Write text to a file, creating parents."""
+                ensure_dir(path.parent)
+                path.write_text(content)
+            
+            
+            # ---------- Data models ----------
+            
+            
+            @dataclass
+            class Config:
+                mirror_path: Path
+                shadow_path: Path
+                checkpoint_remote: str
+                namespace: str
+                exclude_globs: List[str]
+                author_name: str
+                author_email: str
+                sandbox_id: str
+            
+                @property
+                def git_env(self) -> dict:
+                    """Environment pointing git to the shadow repo (git dir) and mirrored worktree."""
+                    return {
+                        "GIT_DIR": str(self.shadow_path / ".git"),
+                        "GIT_WORK_TREE": str(self.mirror_path),
+                    }
+            
+            
+            # ---------- Git utilities ----------
+            
+            
+            def is_git_repo(path: Path) -> bool:
+                return (path / ".git").is_dir()
+            
+            
+            def init_shadow_repo(cfg: Config) -> None:
+                """
+                Initialize the shadow repo if needed and ensure remotes are configured.
+                - workspace remote: file:// path to the mirrored dev repo .git
+                - checkpoint remote: the BYO Git host (file:// for PoC)
+                """
+                env = cfg.git_env
+                git_dir = cfg.shadow_path / ".git"
+            
+                if not git_dir.is_dir():
+                    ensure_dir(cfg.shadow_path)
+                    run(["git", "init"], env=env)
+                    run(["git", "config", "user.name", cfg.author_name], env=env)
+                    run(["git", "config", "user.email", cfg.author_email], env=env)
+            
+                # Ensure core.worktree points to the mirrored dev tree.
+                run(["git", "config", "core.worktree", str(cfg.mirror_path)], env=env)
+            
+                # Ignore the source .git folder (and other heavy dirs) when committing.
+                exclude_file = git_dir / "info/exclude"
+                existing = exclude_file.read_text().splitlines() if exclude_file.exists() else []
+                for pattern in [".git"] + cfg.exclude_globs:
+                    if pattern not in existing:
+                        existing.append(pattern)
+                write_text(exclude_file, "\n".join(existing) + "\n")
+            
+                workspace_remote = f"file://{cfg.mirror_path}/.git"
+            
+                # Ensure remotes are set (idempotent).
+                remotes = run(["git", "remote"], env=env).splitlines()
+                if "workspace" not in remotes:
+                    run(["git", "remote", "add", "workspace", workspace_remote], env=env)
+                else:
+                    run(["git", "remote", "set-url", "workspace", workspace_remote], env=env)
+            
+                if "checkpoint" not in remotes:
+                    run(["git", "remote", "add", "checkpoint", cfg.checkpoint_remote], env=env)
+                else:
+                    run(["git", "remote", "set-url", "checkpoint", cfg.checkpoint_remote], env=env)
+            
+            
+            def current_branch(mirror: Path) -> str:
+                """
+                Discover the current branch in the mirrored dev repo.
+                If detached, synthesize a name so we always have a ref name to target.
+                """
+                branch = run(["git", "-C", str(mirror), "rev-parse", "--abbrev-ref", "HEAD"])
+                if branch == "HEAD":
+                    sha = run(["git", "-C", str(mirror), "rev-parse", "--short", "HEAD"])
+                    return f"detached-{sha}"
+                return branch
+            
+            
+            def update_from_workspace(cfg: Config, branch: str) -> str:
+                """
+                Fetch latest objects from the workspace remote and move the checkpoint branch to that tip.
+            
+                Returns the base ref used for checkpointing (remote-tracking ref or FETCH_HEAD).
+                """
+                env = cfg.git_env
+                run(["git", "fetch", "--prune", "--no-tags", "workspace"], env=env)
+                base_ref = f"refs/remotes/workspace/{branch}"
+            
+                # If the branch doesn't exist remotely (e.g., detached), fall back to FETCH_HEAD.
+                show_ref = subprocess.run(
+                    ["git", "show-ref", "--verify", base_ref],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    env={**os.environ, **env},
+                )
+                if show_ref.returncode != 0:
+                    base_ref = "FETCH_HEAD"
+            
+                checkpoint_branch = f"refs/heads/checkpoint/{branch}"
+                run(["git", "update-ref", checkpoint_branch, base_ref], env=env)
+                run(["git", "symbolic-ref", "HEAD", checkpoint_branch], env=env)
+            
+                # Reset index to the workspace tip without touching the mirrored worktree.
+                run(["git", "reset", "--mixed", base_ref], env=env)
+            
+                return base_ref
+            
+            
+            def has_dirty_worktree(cfg: Config) -> bool:
+                status = run(["git", "status", "--porcelain"], env=cfg.git_env)
+                return bool(status.strip())
+            
+            
+            def create_checkpoint_commit(cfg: Config, branch: str) -> Optional[str]:
+                """
+                If there are working tree changes, create a checkpoint commit.
+                Returns the new commit SHA if created, otherwise None.
+                """
+                env = cfg.git_env
+                if not has_dirty_worktree(cfg):
+                    return None
+                run(["git", "add", "-A"], env=env)
+                message = f"checkpoint {branch} @ {datetime.utcnow().isoformat()}Z"
+                run(
+                    [
+                        "git",
+                        "commit",
+                        "-m",
+                        message,
+                        "--author",
+                        f"{cfg.author_name} <{cfg.author_email}>",
+                    ],
+                    env=env,
+                )
+                sha = run(["git", "rev-parse", "HEAD"], env=env)
+                return sha
+            
+            
+            def push_checkpoint(cfg: Config, branch: str, base_ref: str) -> None:
+                """
+                Push both:
+                - The workspace branch tip (base_ref) to refs/heads/<branch>.
+                - The checkpoint branch tip to refs/checkpoints/<namespace>/<branch>.
+                """
+                env = cfg.git_env
+                checkpoint_ref = f"{cfg.namespace}/{branch}"
+                checkpoint_branch = f"refs/heads/checkpoint/{branch}"
+            
+                # Push the base graph (includes unpushed user commits).
+                run(["git", "push", "-f", "checkpoint", f"{base_ref}:refs/heads/{branch}"], env=env)
+            
+                # Push the checkpoint commit (synthetic ref).
+                run(
+                    ["git", "push", "-f", "checkpoint", f"{checkpoint_branch}:{checkpoint_ref}"],
+                    env=env,
+                )
+            
+            
+            # ---------- Main flow ----------
+            
+            
+            def parse_args() -> Config:
+                parser = argparse.ArgumentParser(
+                    description="Crafting checkpoint agent (PoC, no-rsync)",
+                    formatter_class=argparse.RawDescriptionHelpFormatter,
+                    epilog=textwrap.dedent(
+                        """\
+                        Environment variables that override defaults:
+                          SANDBOX_ID           -> used in the checkpoint ref namespace
+                          CHECKPOINT_REMOTE    -> remote URL (file:// for PoC, ssh:// in prod)
+                        """
+                    ),
+                )
+                parser.add_argument("--mirror-path", default="/home/owner/dev-mirror")
+                parser.add_argument("--shadow-path", default="/home/owner/checkpoints/shadow")
+                parser.add_argument("--namespace", default="refs/checkpoints/demo")
+                parser.add_argument(
+                    "--checkpoint-remote",
+                    default=os.environ.get("CHECKPOINT_REMOTE", "file:///home/owner/checkpoints/remote.git"),
+                )
+                parser.add_argument(
+                    "--exclude",
+                    action="append",
+                    default=[".git", "node_modules", ".venv", ".cache", "dist", "build", "__pycache__"],
+                    help="Glob to exclude from checkpoint working tree",
+                )
+                parser.add_argument("--author-name", default="Crafting Checkpoint")
+                parser.add_argument("--author-email", default="checkpoint@crafting.dev")
+                parser.add_argument("--sandbox-id", default=os.environ.get("SANDBOX_ID", "demo-sandbox"))
+            
+                args = parser.parse_args()
+                return Config(
+                    mirror_path=Path(args.mirror_path),
+                    shadow_path=Path(args.shadow_path),
+                    checkpoint_remote=args.checkpoint_remote,
+                    namespace=args.namespace.rstrip("/"),
+                    exclude_globs=args.exclude,
+                    author_name=args.author_name,
+                    author_email=args.author_email,
+                    sandbox_id=args.sandbox_id,
+                )
+            
+            
+            def main() -> int:
+                cfg = parse_args()
+            
+                if not is_git_repo(cfg.mirror_path):
+                    print(f"[checkpoint] mirror repo missing or not a git repo: {cfg.mirror_path}", file=sys.stderr)
+                    return 1
+            
+                ensure_dir(cfg.shadow_path)
+                init_shadow_repo(cfg)
+            
+                branch = current_branch(cfg.mirror_path)
+                base_ref = update_from_workspace(cfg, branch)
+            
+                new_commit = create_checkpoint_commit(cfg, branch)
+                if new_commit:
+                    print(f"[checkpoint] created checkpoint commit {new_commit} on checkpoint/{branch}")
+                else:
+                    print("[checkpoint] no dirty worktree; reusing workspace tip")
+            
+                push_checkpoint(cfg, branch, base_ref)
+                print(
+                    f"[checkpoint] pushed workspace tip + checkpoint to {cfg.checkpoint_remote} "
+                    f"(branch={branch}, namespace={cfg.namespace})"
+                )
+                return 0
+            
+            
+            if __name__ == "__main__":
+                raise SystemExit(main())
+        - path: /home/owner/checkpoint_cron.sh
+          owner: 1000:1000
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            # Cron-style runner: one-shot bootstrap + checkpoint.
+            
+            set -euo pipefail
+            
+            MIRROR_PATH="${MIRROR_PATH:-/home/owner/dev-mirror}"
+            SHADOW_PATH="${SHADOW_PATH:-/home/owner/checkpoints/shadow}"
+            CHECKPOINT_REMOTE="${CHECKPOINT_REMOTE:-file:///home/owner/checkpoints/remote.git}"
+            CHECKPOINT_NAMESPACE="${CHECKPOINT_NAMESPACE:-refs/checkpoints/demo}"
+            
+            LOG_DIR="${LOG_DIR:-/home/owner/checkpoints/logs}"
+            LOG_FILE="${LOG_FILE:-${LOG_DIR}/checkpoint.log}"
+            
+            mkdir -p "${LOG_DIR}"
+            
+            # Ensure mutagen session, dirs, and remote are ready.
+            /home/owner/bootstrap.sh >> "${LOG_FILE}" 2>&1 || true
+            
+            timestamp="$(date --iso-8601=seconds)"
+            echo "[cron] ${timestamp} starting checkpoint run" >> "${LOG_FILE}"
+            python3 /home/owner/checkpoint_agent.py \
+              --mirror-path "${MIRROR_PATH}" \
+              --shadow-path "${SHADOW_PATH}" \
+              --checkpoint-remote "${CHECKPOINT_REMOTE}" \
+              --namespace "${CHECKPOINT_NAMESPACE}" \
+              >> "${LOG_FILE}" 2>&1 || true
+            
+            exit 0
+        - path: /home/owner/.ssh/checkpoint_remote_ed25519
+          owner: 1000:1000
+          mode: "0600"
+          content: |
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZWQyNTUxOQAAACCQF0MMH957IN4ImvFFY9LI+4XqY5UgCdNFdOf88SuP7QAAAJC/BYlEvwWJRAAAAAtzc2gtZWQyNTUxOQAAACCQF0MMH957IN4ImvFFY9LI+4XqY5UgCdNFdOf88SuP7QAAAEDdrjjQZKLCBF2wQhJmD0rOu6NPndI4YkCEKcdUpnQp45AXQwwf3nsg3gia8UVj0sj7hepjlSAJ00V05/zxK4/tAAAACW93bmVyQG9wcwECAwQ=
+            -----END OPENSSH PRIVATE KEY-----
+        - path: /home/owner/.ssh/checkpoint_remote_ed25519.pub
+          owner: 1000:1000
+          mode: "0644"
+          content: |
+            ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJAXQwwf3nsg3gia8UVj0sj7hepjlSAJ00V05/zxK4/t owner@ops
+        - path: /home/owner/.ssh/config
+          owner: 1000:1000
+          mode: "0600"
+          content: |
+            Host ssh-remote
+              HostName ssh-remote
+              Port 2222
+              User owner
+              IdentityFile /home/owner/.ssh/checkpoint_remote_ed25519
+              StrictHostKeyChecking yes
+              UserKnownHostsFile /home/owner/.ssh/known_hosts
+              IdentitiesOnly yes
+        - path: /home/owner/.ssh/known_hosts
+          owner: 1000:1000
+          mode: "0644"
+          content: |
+            [ssh-remote]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFUqdA9TlwU8yoV+cWDWrygQKhOPmrMgrMsEj3rXinmR
+  - name: ssh-remote
+    description: Bare Git remote served over SSH for checkpoint tests
+    system:
+      daemons:
+        - name: ssh-remote
+          spec:
+            argv:
+              - bash
+              - /home/owner/start_ssh_remote.sh
+            identity:
+              uid: 1000
+      files:
+        - path: /home/owner/start_ssh_remote.sh
+          owner: 1000:1000
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            # Start a local SSH daemon that serves a bare checkpoint repo.
+            set -euo pipefail
+            
+            SSH_DIR="/home/owner/.ssh"
+            LOG_FILE="/home/owner/ssh_remote.log"
+            REPO_PATH="/home/owner/checkpoints/remote.git"
+            
+            mkdir -p "${SSH_DIR}" "/home/owner/checkpoints"
+            chmod 700 "${SSH_DIR}" "/home/owner/checkpoints"
+            
+            # Ensure repo exists for pushes.
+            if [[ ! -d "${REPO_PATH}" ]]; then
+              git init --bare "${REPO_PATH}"
+            fi
+            
+            chmod 600 "${SSH_DIR}/ssh_host_checkpoint_ed25519" "${SSH_DIR}/authorized_keys"
+            chmod 644 "${SSH_DIR}/ssh_host_checkpoint_ed25519.pub"
+            chmod 600 "${SSH_DIR}/sshd_config"
+            
+            SSHD_BIN="$(command -v sshd || true)"
+            if [[ -z "${SSHD_BIN}" ]]; then
+              echo "[ssh-remote] sshd binary not found" | tee -a "${LOG_FILE}"
+              exit 1
+            fi
+            
+            echo "[ssh-remote] starting sshd on port 2222 with repo ${REPO_PATH}" | tee -a "${LOG_FILE}"
+            exec "${SSHD_BIN}" -D -f "${SSH_DIR}/sshd_config" -E "${LOG_FILE}"
+        - path: /home/owner/.ssh/ssh_host_checkpoint_ed25519
+          owner: 1000:1000
+          mode: "0600"
+          content: |
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZWQyNTUxOQAAACBVKnQPU5cFPMqFfnFg1q8oECoTj5qzIKzLBI9614p5kQAAAJB5X8l1eV/JdQAAAAtzc2gtZWQyNTUxOQAAACBVKnQPU5cFPMqFfnFg1q8oECoTj5qzIKzLBI9614p5kQAAAEBL2LF23HIzEAZxEY+y0uqvPrbh4L7pAWNpqZaAAL0fu1UqdA9TlwU8yoV+cWDWrygQKhOPmrMgrMsEj3rXinmRAAAACW93bmVyQG9wcwECAwQ=
+            -----END OPENSSH PRIVATE KEY-----
+        - path: /home/owner/.ssh/ssh_host_checkpoint_ed25519.pub
+          owner: 1000:1000
+          mode: "0644"
+          content: |
+            ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFUqdA9TlwU8yoV+cWDWrygQKhOPmrMgrMsEj3rXinmR owner@ops
+        - path: /home/owner/.ssh/authorized_keys
+          owner: 1000:1000
+          mode: "0600"
+          content: |
+            ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJAXQwwf3nsg3gia8UVj0sj7hepjlSAJ00V05/zxK4/t owner@ops
+        - path: /home/owner/.ssh/sshd_config
+          owner: 1000:1000
+          mode: "0600"
+          content: |
+            Port 2222
+            ListenAddress 0.0.0.0
+            HostKey /home/owner/.ssh/ssh_host_checkpoint_ed25519
+            PidFile /home/owner/.ssh/sshd.pid
+            AuthorizedKeysFile /home/owner/.ssh/authorized_keys
+            PasswordAuthentication no
+            ChallengeResponseAuthentication no
+            KbdInteractiveAuthentication no
+            UsePAM no
+            PermitRootLogin no
+            PubkeyAuthentication yes
+            AllowUsers owner
+            PrintMotd no
+            UseDNS no
+            Subsystem sftp internal-sftp
